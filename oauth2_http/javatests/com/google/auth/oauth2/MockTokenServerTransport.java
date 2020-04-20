@@ -53,6 +53,13 @@ import java.util.Queue;
 /** Mock transport to simulate providing Google OAuth2 access tokens */
 public class MockTokenServerTransport extends MockHttpTransport {
 
+  public static final String DEFAULT_ID_TOKEN =
+      "eyJhbGciOiJSUzI1NiIsImtpZCI6ImRmMzc1ODkwOGI3OTIyO"
+          + "TNhZDk3N2EwYjk5MWQ5OGE3N2Y0ZWVlY2QiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOiJodHRwczovL2Zvby5iYXIiL"
+          + "CJhenAiOiIxMDIxMDE1NTA4MzQyMDA3MDg1NjgiLCJleHAiOjE1NjQ0NzUwNTEsImlhdCI6MTU2NDQ3MTQ1MSwi"
+          + "aXNzIjoiaHR0cHM6Ly9hY2NvdW50cy5nb29nbGUuY29tIiwic3ViIjoiMTAyMTAxNTUwODM0MjAwNzA4NTY4In0"
+          + ".redacted";
+
   static final String EXPECTED_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:jwt-bearer";
   static final JsonFactory JSON_FACTORY = new JacksonFactory();
   int buildRequestCount;
@@ -168,6 +175,11 @@ public class MockTokenServerTransport extends MockHttpTransport {
               throw new IOException("Refresh Token not found.");
             }
             accessToken = refreshTokens.get(refreshToken);
+
+            String foundTargetAudience = (String) query.get("audience");
+            if (foundTargetAudience != null) {
+              generateAccessToken = false;
+            }
           } else if (query.containsKey("grant_type")) {
             String grantType = query.get("grant_type");
             if (!EXPECTED_GRANT_TYPE.equals(grantType)) {
@@ -209,7 +221,7 @@ public class MockTokenServerTransport extends MockHttpTransport {
               responseContents.put("refresh_token", refreshToken);
             }
           } else {
-            responseContents.put("id_token", ServiceAccountCredentialsTest.DEFAULT_ID_TOKEN);
+            responseContents.put("id_token", DEFAULT_ID_TOKEN);
           }
           String refreshText = responseContents.toPrettyString();
 

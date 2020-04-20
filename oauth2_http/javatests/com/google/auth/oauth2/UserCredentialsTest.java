@@ -180,6 +180,33 @@ public class UserCredentialsTest extends BaseSerializationTest {
   }
 
   @Test
+  public void idTokenWithAudience_hasIdToken() throws IOException {
+    MockTokenServerTransportFactory transportFactory = new MockTokenServerTransportFactory();
+    transportFactory.transport.addClient(CLIENT_ID, CLIENT_SECRET);
+    transportFactory.transport.addRefreshToken(REFRESH_TOKEN, ACCESS_TOKEN);
+    UserCredentials credentials =
+        UserCredentials.newBuilder()
+            .setClientId(CLIENT_ID)
+            .setClientSecret(CLIENT_SECRET)
+            .setRefreshToken(REFRESH_TOKEN)
+            .setHttpTransportFactory(transportFactory)
+            .build();
+
+    String targetAudience = "https://foo.bar";
+    IdTokenCredentials tokenCredential =
+        IdTokenCredentials.newBuilder()
+            .setIdTokenProvider(credentials)
+            .setTargetAudience(targetAudience)
+            .build();
+    tokenCredential.refresh();
+    assertEquals(MockTokenServerTransport.DEFAULT_ID_TOKEN, tokenCredential.getAccessToken().getTokenValue());
+    assertEquals(MockTokenServerTransport.DEFAULT_ID_TOKEN, tokenCredential.getIdToken().getTokenValue());
+    assertEquals(
+        targetAudience,
+        tokenCredential.getIdToken().getJsonWebSignature().getPayload().getAudience());
+  }
+
+  @Test
   public void getRequestMetadata_customTokenServer_hasAccessToken() throws IOException {
     final URI TOKEN_SERVER = URI.create("https://foo.com/bar");
     MockTokenServerTransportFactory transportFactory = new MockTokenServerTransportFactory();

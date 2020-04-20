@@ -53,11 +53,13 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.net.URI;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import javax.annotation.Nullable;
 
 /** OAuth2 Credentials representing a user's identity and consent. */
-public class UserCredentials extends GoogleCredentials {
+public class UserCredentials extends GoogleCredentials implements IdTokenProvider {
 
   private static final String GRANT_TYPE = "refresh_token";
   private static final String PARSE_ERROR_PREFIX = "Error parsing token refresh response. ";
@@ -177,14 +179,15 @@ public class UserCredentials extends GoogleCredentials {
             fileType, USER_FILE_TYPE));
   }
 
-  /** Refreshes the OAuth2 access token by getting a new access token from the refresh token */
-  @Override
-  public AccessToken refreshAccessToken() throws IOException {
+  private GenericData sendRequest(@Nullable String audience) throws IOException {
     if (refreshToken == null) {
       throw new IllegalStateException(
           "UserCredentials instance cannot refresh because there is no" + " refresh token.");
     }
     GenericData tokenRequest = new GenericData();
+    if (audience != null) {
+        tokenRequest.set("audience", audience);
+    }
     tokenRequest.set("client_id", clientId);
     tokenRequest.set("client_secret", clientSecret);
     tokenRequest.set("refresh_token", refreshToken);
@@ -195,7 +198,21 @@ public class UserCredentials extends GoogleCredentials {
     HttpRequest request = requestFactory.buildPostRequest(new GenericUrl(tokenServerUri), content);
     request.setParser(new JsonObjectParser(JSON_FACTORY));
     HttpResponse response = request.execute();
-    GenericData responseData = response.parseAs(GenericData.class);
+    return response.parseAs(GenericData.class);
+  }
+
+  /** Returns a Google OpenID Token with the provided audience field. */
+  @Override
+  public IdToken idTokenWithAudience(String targetAudience, List<Option> options) throws IOException {
+    GenericData responseData = sendRequest(targetAudience);
+    String rawToken = OAuth2Utils.validateString(responseData, "id_token", PARSE_ERROR_PREFIX);
+    return IdToken.create(rawToken);
+  }
+
+  /** Refreshes the OAuth2 access token by getting a new access token from the refresh token */
+  @Override
+  public AccessToken refreshAccessToken() throws IOException {
+    GenericData responseData = sendRequest(null);
     String accessToken =
         OAuth2Utils.validateString(responseData, "access_token", PARSE_ERROR_PREFIX);
     int expiresInSeconds =
